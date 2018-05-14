@@ -40,15 +40,24 @@ class RNNVAE(nn.Module):
     self.dec_word_vecs = nn.Embedding(vocab_size, dec_word_dim)
     dec_input_size = dec_word_dim
     dec_input_size += latent_dim
-    self.dec_rnn = nn.LSTM(dec_input_size, dec_h_dim, num_layers = dec_num_layers,
-                           batch_first = True)
     if self.skip == 0:
       self.dec_linear = nn.Linear(dec_h_dim, vocab_size)
     else:
       self.dec_linear = nn.Linear(dec_h_dim + latent_dim, vocab_size)
+    
+    if self.skip == 0 or self.dec_num_layers == 1:      
+      self.dec_rnn = nn.LSTM(dec_input_size, dec_h_dim, num_layers = dec_num_layers,
+                             batch_first = True)
+      self.dec = nn.ModuleList([self.dec_word_vecs, self.dec_rnn, self.dec_linear])      
+    else:
+      self.dec_rnn = nn.ModuleList([nn.LSTM(dec_input_size, dec_h_dim,  batch_first = True)
+                                    if k == 0 else
+                                    nn.LSTM(dec_h_dim + latent_dim, dec_h_dim, batch_first=True)
+                                    for k in range(self.dec_num_layers)])
+      self.dec = nn.ModuleList([self.dec_word_vecs, self.dec_linear, *self.dec_rnn])
+        
     self.dropout = nn.Dropout(dec_dropout)
       
-    self.dec = nn.ModuleList([self.dec_word_vecs, self.dec_rnn, self.dec_linear])
     if latent_dim > 0:
       self.latent_hidden_linear = nn.Linear(latent_dim, dec_h_dim)
       self.dec.append(self.latent_hidden_linear)
@@ -91,7 +100,13 @@ class RNNVAE(nn.Module):
       dec_input = self.word_vecs
     if q_z is not None:
       self.h0[-1] = self.latent_hidden_linear(q_z)
-    memory, _ = self.dec_rnn(dec_input, (self.h0, self.c0))
+    if self.skip == 0 or self.dec_num_layers == 1:
+      memory, _ = self.dec_rnn(dec_input, (self.h0, self.c0))
+    else:      
+      for k in range(self.dec_num_layers):        
+        memory, _ = self.dec_rnn[k](dec_input, (self.h0[k].unsqueeze(0), self.c0[k].unsqueeze(0)))  
+        dec_input = torch.cat([memory, q_z_expand], 2)
+        
     memory = self.dropout(memory)
     if self.skip == 1:
       dec_linear_input = torch.cat([memory.contiguous(), q_z_expand], 2)
