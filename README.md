@@ -1,6 +1,6 @@
-# Semi-Amortized Variational Autoencoders
+# Skip-VAE
 Code for the paper:  
-[Avoiding Latent Variable Collapse With Generative Skip Models](https://arxiv.org/pdf/1807.04863.pdf)
+[Avoiding Latent Variable Collapse With Generative Skip Models](https://arxiv.org/pdf/1807.04863.pdf)  
 Adji B. Dieng, Yoon Kim, Alexander M. Rush, David M. Blei.
 
 Our code/data is based on the [Semi-Amortized VAE repo](https://github.com/harvardnlp/sa-vae).
